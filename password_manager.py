@@ -173,3 +173,39 @@ class PasswordManager:
         if not selected :
             messagebox.showwarning("Select","Please select an entry to edit") 
             return                
+        item = self.tree.item(selected[0])
+        entry_id = item['tags'][0]
+        values = item['values']
+
+        self.show_entry_dailog(edit_mode=True, entry_id = entry_id, current = values)
+
+    def show_entry_dailog(self, edit_mode= False, entry_id=None, current = None):
+        dailog = tk.Toplevel(self.root)
+        dailog.title("Edit Entry" if edit_mode else "Add New Entry")
+        dailog.geometry("400x300")
+        dailog.transient(self.root)
+        dailog.grab_set()
+
+        tk.Label(dailog, text="Website/Service:").pack(pady=5)
+        website_entry = tk.Entry(dailog, width=50)
+        website_entry.pack(pady=5)
+
+        tk.Label(dailog, text="Username/Email:").pack(pady=5)
+        username_entry = tk.Entry(dailog, width=50)
+        username_entry.pack(pady=5)
+
+        tk.Label(dailog, text="Paswword:").pack(pady=5)
+        password_entry = tk.Entry(dailog, width=50)
+        password_entry.pack(pady=5)
+
+        tk.Label(dailog, text="Notes(optional):").pack(pady=5)
+        notes_entry = tk.Entry(dailog, width=50)
+        notes_entry.pack(pady=5)
+
+        tk.Button(dailog, text="Generate Strong Password",
+                  command=lambda: password_entry.insert(0, os.urandom(16).hex())).pack(pady=5)
+        
+        if edit_mode():
+            website_entry.insert(0, current[0])
+            username_entry.insert(0, current[1])
+            
