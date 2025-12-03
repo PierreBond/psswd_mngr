@@ -207,5 +207,20 @@ class PasswordManager:
         
         if edit_mode():
             website_entry.insert(0, current[0])
-            username_entry.insert(0, current[1])
+            username_entry.insert(0, current[1] != "" else "")
+            notes_entry.insert(0, current[3] if current[3] else "")
+            
+        def save():
+            website = website_entry.get.strip()
+            username =  username_entry.get.strip()
+            password =  password_entry.get.strip()
+            notes = notes_entry.get.strip()
+
+            if not website or not password:
+                messagebox.showerror("Error", "Website amd Password are required")
+                return
+            enc_password =  self.encrypt(password)
+
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
             
