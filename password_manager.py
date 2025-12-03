@@ -107,4 +107,69 @@ class PasswordManager:
         btn_frame = tk.Frame(self.root)
         btn_frame.pack(pady=5)
 
-        tk.Button(btn_frame, text="Add New", command=self.add_entry, bg=)
+        tk.Button(btn_frame, text="Add New", command=self.add_entry, bg="#4CAF50" , fg="white", width=12).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Refresh", command=self.load_passwords, bg="#2196F3" , fg="white", width=12).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Exit", command=self.root_quit, bg="#f44336" , fg="white", width=12).pack(side=tk.LEFT, padx=5)
+
+        # treeview
+        columns = ("website", "username", "password", "notes")
+        self.tree = ttk.Treeview(self.root, columns=columns, show="headings")
+        self.tree.pack(padx=2, pady=10, fill=tk.BOTH, expand=True)
+
+        self.tree.heading("website", text= "Website/Service")
+        self.tree.heading("username", text= "Username/Email")
+        self.tree.heading("Password", text= "Paswword")
+        self.tree.heading("notes", text= "Notes")
+
+        self.tree.column("website", width=180)
+        self.tree.column("username", width=160)
+        self.tree.column("password", width=120, anchor=tk.CENTER)
+        self.tree.column("notes", width=150)
+
+        # right click menu 
+        self.menu = tk.Menu(self.root, tearoff=0)
+        self.menu.add_command(label = "copy password", command= self.copy_password)
+        self.menu.add_command(label = "edit", command= self.edit_entry)
+        self.menu.add_command(label = "delete", command= self.delete_entry)
+        self.tree.bind("<Button-3>", self.show_context_menu)
+
+    def encrypt(self, text):
+        return self.fernet.encrypt(text.encode()).decode()
+    
+    def decrypt(self, token):
+        return self.fernet.decrypt(token.encode()).decode()
+    def load_passwords(self):
+        for items in self.tree.get_children():
+            self.tree.delete(items)
+
+        search_item = self.search_var.get()
+
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        c.execute("SELECT id , website, username, password, notes FROM vault")
+        rows = c.fetchall()
+
+        for row in rows:
+            id_, website, username, enc_pass, notes = row 
+            try:
+                password = self.decrypt(enc_pass)
+            except:
+                password = "Decryption Error"
+
+            website_lower =website.lower()  
+            username_lower = "" if not username else username.lowere()
+
+            if search_items in website_lower or search_item in username_lower:
+                self.tree.insert("", tk.END, values=(website, username or "","••••••••", notes or ""), tags=(id_))
+
+
+        conn.close()
+
+    def add_entry(self):
+        self.show_entry_dailog()
+
+    def edit_entry(self):
+        selected = self.tree.selection()
+        if not selected :
+            messagebox.showwarning("Select","Please select an entry to edit") 
+            return                
