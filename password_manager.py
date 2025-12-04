@@ -7,6 +7,7 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes 
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import pyperclip
+from typing import Optional
 
 DB_NAME = "passwords.db"
 
@@ -28,6 +29,7 @@ class PasswordManager:
         self.root.resizable(False,False)
 
         self.fernet = None
+        self.fernet: Optional[Fernet] = None
         self.master_password = None 
 
         if not os.path.exists(DB_NAME):
@@ -109,7 +111,7 @@ class PasswordManager:
 
         tk.Button(btn_frame, text="Add New", command=self.add_entry, bg="#4CAF50" , fg="white", width=12).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="Refresh", command=self.load_passwords, bg="#2196F3" , fg="white", width=12).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Exit", command=self.root_quit, bg="#f44336" , fg="white", width=12).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Exit", command=self.root.quit, bg="#f44336" , fg="white", width=12).pack(side=tk.LEFT, padx=5)
 
         # treeview
         columns = ("website", "username", "password", "notes")
@@ -134,9 +136,13 @@ class PasswordManager:
         self.tree.bind("<Button-3>", self.show_context_menu)
 
     def encrypt(self, text):
+        if self.fernet is None:
+            raise ValueError("Master password not unlocked")
         return self.fernet.encrypt(text.encode()).decode()
     
     def decrypt(self, token):
+        if self.fernet is None:
+            raise ValueError("Master password not unlocked")
         return self.fernet.decrypt(token.encode()).decode()
     def load_passwords(self):
         for items in self.tree.get_children():
@@ -159,7 +165,7 @@ class PasswordManager:
             website_lower =website.lower()  
             username_lower = "" if not username else username.lowere()
 
-            if search_items in website_lower or search_item in username_lower:
+            if self.tree in website_lower or search_item in username_lower:
                 self.tree.insert("", tk.END, values=(website, username or "","••••••••", notes or ""), tags=(id_))
 
 
@@ -205,16 +211,16 @@ class PasswordManager:
         tk.Button(dailog, text="Generate Strong Password",
                   command=lambda: password_entry.insert(0, os.urandom(16).hex())).pack(pady=5)
         
-        if edit_mode():
+        if edit_mode and current:
             website_entry.insert(0, current[0])
-            username_entry.insert(0, current[1] != "" else "")
+            username_entry.insert(0, current[1] if current[1] != "" else "")
             notes_entry.insert(0, current[3] if current[3] else "")
             
         def save():
-            website = website_entry.get.strip()
-            username =  username_entry.get.strip()
-            password =  password_entry.get.strip()
-            notes = notes_entry.get.strip()
+            website = website_entry.get().strip()
+            username =  username_entry.get().strip()
+            password =  password_entry.get().strip()
+            notes = notes_entry.get().strip()
 
             if not website or not password:
                 messagebox.showerror("Error", "Website amd Password are required")
@@ -223,4 +229,61 @@ class PasswordManager:
 
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
-            
+
+            if edit_mode:
+                c.execute("UPDATE vault SET website=?, username=?, password=?, notes=? WHERE id=?",
+                          (website, username,password, notes, entry_id))
+            else:
+                 c.execute("INSERT INTO vault (website, username,password, notes) VALUES (?, ?, ?, ?)",
+                          (website, username,password, notes, entry_id))  
+            conn.commit()
+            conn.close()
+
+            dailog.destroy()
+            self.load_passwords()
+
+        tk.Button(dailog, text="Save", command= save, bg="#4CAF50",fg="white").pack(pady=10)
+
+    def delete_entry(self):
+        selected = self.tree.selection()
+        if not selected:
+            return
+        if messagebox.askyesno("Delete", "Delete this entry permanently?"):
+            entry_id = self.tree.item(selected[0])['tags'][0]
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
+            c.execute("DELETE FROM vault WHERE id=?", (entry_id,))
+            conn.commit()
+            conn.close()
+            self.load_passwords()
+
+    def copy_password(self):
+        selected = self.tree.selection()
+        if not selected:
+            return
+        entry_id = self.tree.item(selected[0])['tags'][0]
+
+        conn =sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        c.execute("SELECT password FROM vault WHERE id=?", (entry_id,))
+        enc_pass = c.fetchone()[0]
+        conn.close()
+
+        try:
+            password =  self.decrypt(enc_pass)
+            pyperclip.copy(password)
+            messagebox.showinfo("Copied", "Password copied to clipboard")
+        except:
+            messagebox.showerror("Error", "Failes to decrypt password")
+
+    def show_context_menu(self, event):
+            try:
+                self.menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                self.menu.grab_release()
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = PasswordManager(root)
+    root.mainloop()
