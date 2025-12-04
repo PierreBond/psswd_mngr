@@ -58,6 +58,21 @@ class PasswordManager:
             
             #Generate TOTP secret
             totp_secret = pyotp.random_base32(32)
+            totp_uri = pyotp.totp.TOTP(totp_secret).provisioning_uri(
+                name="LocalPasswordManager",
+                issuer_name="MyPasswordManager"
+            )
+
+            #Create QR code 
+            qr = pyqrcode.create(totp_uri)
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                qr.png(tmp.name, scale=6)
+                qr_path = tmp.name
+
+            # Show QR code
+            qr_window = tk.Toplevel(self.root)
+            qr_window.title("Scan with Aithenticator App")
+            qr_window.geometry("300x350")
 
 
 
