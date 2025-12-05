@@ -85,28 +85,36 @@ class PasswordManager:
                      font=("Courier",9), bg="#f0f0f0", relief=tk.SOLID, padx=10, pady=10).pack(pady=10)
             
             def verify_2fa():
-                code = simpledialog.askstring("2FA")
+                code = simpledialog.askstring("2FA Required", "Enter the 6-digit code from your app:",parent=qr_window)
+                if code and pyotp.TOTP(totp_secret).verify(code):
+                    qr_window.destroy()
+                    os.unlink(qr_path)
 
+                    # save master password + encrypted TOTP secret
+                    salt = os.urandom(16)
+                    key = derive_key(master, salt)
+                    self.fernet = Fernet(key)
+                    encrypted_totp = self.fernet.encrypt(totp_secret.encode()).decode()
 
-
-            # conn = sqlite3.connect(DB_NAME)
-            # c = conn.cursor()
-            # c.execute('''CREATE TABLE vault(
-            #           id INTEGER PRIMARY KEY
-            #           website TEXT ONT NULL,
-            #           username TEXT,
-            #           password TEXT NOT NULL,
-            #           notes TEXT
-            #           )''')
-            # c.execute(" CREATE TABLE master (salt BLOB)")
-            # c.execute("INSERT INTO master (salt) VALUES (?)", (salt,))
-            # conn.commit()
-            # conn.close()
-            # messagebox.showinfo("Success", "Password Manager Created")
-            # self.setup_gui()
-        else:
-            messagebox.showerror("Error", "Master Password must be at least 8+ characters")
-            self.root.quit()
+                    conn = sqlite3.connect(DB_NAME)
+                    c = conn.cursor()
+                    c.execute('''CREATE TABLE vault(
+                                id INTEGER PRIMARY KEY
+                                website TEXT ONT NULL,
+                                username TEXT,
+                                password TEXT NOT NULL,
+                                notes TEXT
+                                )''')
+                    c.execute(" CREATE TABLE master (salt BLOB)")
+                    c.execute("INSERT INTO master (salt) VALUES (?)", (salt,))
+                    conn.commit()
+                    conn.close()
+                    messagebox.showinfo("Success", "Password Manager Created")
+                    self.setup_gui()
+            
+                else:
+                    messagebox.showerror("Error", "Master Password must be at least 8+ characters")
+                    self.root.quit()
 
     def ask_master_password(self):
         master = simpledialog.askstring("Login", "Enter master Password:",show='*')
