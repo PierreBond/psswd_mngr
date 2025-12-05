@@ -98,24 +98,26 @@ class PasswordManager:
 
                     conn = sqlite3.connect(DB_NAME)
                     c = conn.cursor()
-                    c.execute('''CREATE TABLE vault(
+                    c.execute('''CREATE TABLE IF NOT EXISTS vault(
                                 id INTEGER PRIMARY KEY
                                 website TEXT ONT NULL,
                                 username TEXT,
                                 password TEXT NOT NULL,
                                 notes TEXT
                                 )''')
-                    c.execute(" CREATE TABLE master (salt BLOB)")
-                    c.execute("INSERT INTO master (salt) VALUES (?)", (salt,))
+                    c.execute(" CREATE TABLE IF NOT EXISTSmaster (salt BLOB, totp_secret TEXT)")
+                    c.execute("INSERT INTO master (salt, totp_secret) VALUES (?. ?)", (salt, encrypted_totp))
                     conn.commit()
                     conn.close()
-                    messagebox.showinfo("Success", "Password Manager Created")
+
+                    messagebox.showinfo("Success", "Password Manager Created with 2FA")
                     self.setup_gui()
+                    self.load_passwords()
             
                 else:
                     messagebox.showerror("Error", "Master Password must be at least 8+ characters")
-                    self.root.quit()
-
+                    # self.root.quit()
+            tk.Button(qr_window, text="Ive Scanned , Enter Code", command=verify_2fa, bg="#4CAF50", fg="white").pack(pady=10)
     def ask_master_password(self):
         master = simpledialog.askstring("Login", "Enter master Password:",show='*')
         if not master :
@@ -124,11 +126,14 @@ class PasswordManager:
         
         conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
-        c.execute("SELECT salt FROM master")
+        c.execute("SELECT salt, totp_secret FROM master")
         row = c.fetchone()
         conn.close()
 
-        if row :
+        if not row :
+            messagebox.showerror("Error", "database corrupted")
+            self.root.quit()
+            return
             salt = row[0]
             key = derive_key(master, salt)
             try :
